@@ -7,21 +7,19 @@
 set -e
 
 export SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-export WDIR="${SCRIPT_DIR}"
-export RECOVERY_LINK="$1"
-export MODEL="$2"
+export RECOVERY_LINK="$1" MODEL="$2"
+source "${SCRIPT_DIR}/binaries/colors" "${SCRIPT_DIR}/binaries/gofile.sh"
+
 mkdir -p "recovery" "unpacked" "output"
-source "${WDIR}/binaries/colors"
-source "${WDIR}/binaries/gofile.sh"
 
 # Clean-up is required
-rm -rf "${WDIR}/recovery/"*
-rm -rf "${WDIR}/unpacked/"*
+rm -rf "${SCRIPT_DIR}/recovery/"* \
+    "${SCRIPT_DIR}/unpacked/"*
 
 # Define magiskboot,avbtool and signing key paths
-AVB_KEY="${WDIR}/signing-keys/testkey_rsa2048.pem"
-AVBTOOL="${WDIR}/binaries/avbtool"
-MAGISKBOOT="${WDIR}/binaries/magiskboot"
+AVB_KEY="${SCRIPT_DIR}/signing-keys/testkey_rsa2048.pem"
+AVBTOOL="${SCRIPT_DIR}/binaries/avbtool"
+MAGISKBOOT="${SCRIPT_DIR}/binaries/magiskboot"
 
 # Define the usage
 usage() {
@@ -40,7 +38,7 @@ init_patch_recovery(){
         echo -e "\n\t${UNBOLD_GREEN}Installing requirements...${RESET}\n"
         {
             sudo apt update
-            sudo apt install -y lz4
+            sudo apt install -y lz4 curl
         } && touch .requirements
     fi
 }
@@ -51,9 +49,9 @@ download_recovery(){
 
     echo -e "${LIGHT_YELLOW}[INFO] Downloading:${RESET} ${BOLD}${RECOVERY_LINK}${RESET}\n"
 
-    curl -L "${RECOVERY_LINK}" -o "${WDIR}/recovery/$(basename "${RECOVERY_LINK}")"
+    curl -L "${RECOVERY_LINK}" -o "${SCRIPT_DIR}/recovery/$(basename "${RECOVERY_LINK}")"
     elif [ -f "${RECOVERY_LINK}" ]; then
-    cp "${RECOVERY_LINK}" "${WDIR}/recovery/"
+    cp "${RECOVERY_LINK}" "${SCRIPT_DIR}/recovery/"
     else
     echo -e "${BOLD}${RED}Invalid input: not a URL or file.${RESET}\n"
     echo -e "${BOLD}${RED}If you entered a URL, make sure it begins with 'http://' or 'https://'${RESET}\n"
@@ -65,7 +63,7 @@ download_recovery(){
 unarchive_recovery(){
 
     set -x 
-    cd "${WDIR}/recovery/"
+    cd "${SCRIPT_DIR}/recovery/"
     local FILE=$(ls)
     [[ "$FILE" == *.zip ]] && unzip "$FILE" && rm "$FILE"
     [[ "$FILE" == *.lz4 ]] && lz4 -d "$FILE" "${FILE%.lz4}" && rm "$FILE"
@@ -75,27 +73,27 @@ unarchive_recovery(){
         mv "$(ls *.img)" "recovery.img"
     fi
 
-    cd "${WDIR}/"
+    cd "${SCRIPT_DIR}/"
 
-    export RECOVERY_FILE="${WDIR}/recovery/recovery.img"
-    export RECOVERY_SIZE=$(stat -c%s "${WDIR}/recovery/recovery.img")
+    export RECOVERY_FILE="${SCRIPT_DIR}/recovery/recovery.img"
+    export RECOVERY_SIZE=$(stat -c%s "${SCRIPT_DIR}/recovery/recovery.img")
     set +x
 }
 
 # Extract recovery.img
 extract_recovery_image(){
-    cd "${WDIR}/unpacked/"
+    cd "${SCRIPT_DIR}/unpacked/"
 
     echo -e "${LIGHT_YELLOW}[INFO] Extracting:${RESET} ${BOLD}${RECOVERY_FILE}${RESET}\n"
 
 	${MAGISKBOOT} unpack ${RECOVERY_FILE}
 	${MAGISKBOOT} cpio ramdisk.cpio extract
-    cd "${WDIR}/"
+    cd "${SCRIPT_DIR}/"
 }
 
 # Hex patch the "recovery" binary to get fastbootd mode back
 hexpatch_recovery_image(){
-    cd "${WDIR}/unpacked/"
+    cd "${SCRIPT_DIR}/unpacked/"
 
     echo -e "${LIGHT_YELLOW}[INFO] Hex-patching:${RESET} ${BOLD}system/bin/recovery${RESET}\n"
 
@@ -122,39 +120,39 @@ hexpatch_recovery_image(){
 
     set -e
 
-    cd "${WDIR}/"
+    cd "${SCRIPT_DIR}/"
 }
 
 # Repack the fastbootd patched recovery image
 repack_recovery_image(){
-    cd "${WDIR}/unpacked/"
+    cd "${SCRIPT_DIR}/unpacked/"
 
     ${MAGISKBOOT}  cpio ramdisk.cpio 'add 0755 system/bin/recovery system/bin/recovery'
 
-    echo -e "${LIGHT_YELLOW}[INFO] Repacking to:${RESET} ${BOLD}${WDIR}/output/patched-recovery.img${RESET}\n"
+    echo -e "${LIGHT_YELLOW}[INFO] Repacking to:${RESET} ${BOLD}${SCRIPT_DIR}/output/patched-recovery.img${RESET}\n"
 
-	${MAGISKBOOT}  repack ${RECOVERY_FILE} "${WDIR}/output/patched-recovery.img"
+	${MAGISKBOOT}  repack ${RECOVERY_FILE} "${SCRIPT_DIR}/output/patched-recovery.img"
 
-    cd "${WDIR}/"
+    cd "${SCRIPT_DIR}/"
 }
 
 # Sign the patched-recovery.img with Google's RSA private test key
 sign_recovery_image(){
 
-    echo -e "${LIGHT_YELLOW}[INFO] Signing with Google's RSA private test key:${RESET} ${BOLD}${WDIR}/output/patched-recovery.img${RESET}\n"
+    echo -e "${LIGHT_YELLOW}[INFO] Signing with Google's RSA private test key:${RESET} ${BOLD}${SCRIPT_DIR}/output/patched-recovery.img${RESET}\n"
 
     ${AVBTOOL} \
         add_hash_footer \
         --partition_name recovery \
         --partition_size ${RECOVERY_SIZE} \
-        --image "${WDIR}/output/patched-recovery.img" \
+        --image "${SCRIPT_DIR}/output/patched-recovery.img" \
         --key ${AVB_KEY} \
         --algorithm SHA256_RSA2048
 }
 
 # Create an ODIN-flashable tar
 create_tar(){
-    cd "${WDIR}/output/"
+    cd "${SCRIPT_DIR}/output/"
 
     mv patched-recovery.img recovery.img && \
         lz4 -B6 --content-size recovery.img recovery.img.lz4 && \
@@ -170,12 +168,12 @@ create_tar(){
         upload_to_gofile "${MODEL}-Fastbootd-patched-recovery.tar"
     fi
     
-    cd "${WDIR}/"
+    cd "${SCRIPT_DIR}/"
 }
 
 cleanup_source(){
-    rm -rf "${WDIR}/recovery/"*
-    rm -rf "${WDIR}/unpacked/"*    
+    rm -rf "${SCRIPT_DIR}/recovery/"* \
+        "${SCRIPT_DIR}/unpacked/"*   
 }
 
 init_patch_recovery
