@@ -8,7 +8,8 @@ set -e
 
 export SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 export RECOVERY_LINK="$1" MODEL="$2"
-source "${SCRIPT_DIR}/binaries/colors" "${SCRIPT_DIR}/binaries/gofile.sh"
+source "${SCRIPT_DIR}/binaries/colors" 
+source "${SCRIPT_DIR}/binaries/gofile.sh"
 
 mkdir -p "recovery" "unpacked" "output"
 
