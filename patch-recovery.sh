@@ -4,33 +4,26 @@
 # Copyright (c) [2025] [@ravindu644]
 ####################################
 
+shopt -s expand_aliases
 set -e
 
 export SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 export WDIR="${SCRIPT_DIR}"
 export RECOVERY_LINK="$1"
 export MODEL="$2"
-mkdir -p "recovery" "unpacked" "output"
+mkdir -p "recovery" "output"
 source "${WDIR}/binaries/colors"
 source "${WDIR}/binaries/gofile.sh"
 
-# Source the hex patches database
-if [ -f "${WDIR}/hex-patches.sh" ]; then
-    source "${WDIR}/hex-patches.sh"
-    echo -e "${LIGHT_GREEN}[INFO] Loaded $(get_patch_count) hex patches from database${RESET}\n"
-else
-    echo -e "${BOLD}${RED}[ERROR] hex-patches.sh not found! Please ensure it exists in the script directory.${RESET}\n"
-    exit 1
-fi
-
 # Clean-up is required
 rm -rf "${WDIR}/recovery/"*
-rm -rf "${WDIR}/unpacked/"*
 
-# Define magiskboot,avbtool and signing key paths
-AVB_KEY="${WDIR}/signing-keys/testkey_rsa2048.pem"
-AVBTOOL="${WDIR}/binaries/avbtool"
-MAGISKBOOT="${WDIR}/binaries/magiskboot"
+# Define magiskboot's, boot_editor's path and aliases
+export BOOT_EDITOR="${WDIR}/boot_editor_v15_r1/gradlew"
+export MAGISKBOOT="${WDIR}/binaries/magiskboot"
+alias r_unpack="$BOOT_EDITOR unpack"
+alias r_repack="$BOOT_EDITOR pack"
+alias r_clean="$BOOT_EDITOR clear"
 
 # Define the usage
 usage() {
@@ -49,10 +42,19 @@ init_patch_recovery(){
         echo -e "\n\t${UNBOLD_GREEN}Installing requirements...${RESET}\n"
         {
             sudo apt update
-            sudo apt install -y lz4
+            sudo apt install -y lz4 git device-tree-compiler lz4 xz-utils zlib1g-dev openjdk-17-jdk gcc g++ python3 python-is-python3 p7zip-full android-sdk-libsparse-utils erofs-utils
         } && touch .requirements
     fi
 }
+
+# Source the hex patches database
+if [ -f "${WDIR}/hex-patches.sh" ]; then
+    source "${WDIR}/hex-patches.sh"
+    echo -e "${BOLD}${MINT_GREEN}[INFO] Loaded $(get_patch_count) hex patches from database${RESET}\n"
+else
+    echo -e "${BOLD}${RED}[ERROR] hex-patches.sh not found! Please ensure it exists in the script directory.${RESET}\n"
+    exit 1
+fi
 
 # Downloading/copying the recovery
 download_recovery(){
@@ -79,26 +81,48 @@ unarchive_recovery(){
     [[ "$FILE" == *.zip ]] && unzip "$FILE" && rm "$FILE"
     [[ "$FILE" == *.lz4 ]] && lz4 -d "$FILE" "${FILE%.lz4}" && rm "$FILE"
 
-    # Only rename if recovery.img doesn't exists
-    if [ ! -f recovery.img ]; then
-        mv "$(ls *.img)" "recovery.img"
+    # Check for recovery or vendor boot image
+    if [ -f "recovery.img" ]; then
+        export RECOVERY_FILE="$(pwd)/recovery.img"
+    elif [ -f "vendor_boot.img" ]; then
+        export RECOVERY_FILE="$(pwd)/vendor_boot.img"
+    else
+        echo -e "${RED}Error: give a proper recovery.img or vendor_boot.img${RESET}"
+        exit 1
     fi
+
+    export RECOVERY_SIZE=$(stat -c%s "${RECOVERY_FILE}")
+    export IMAGE_NAME="$(basename ${RECOVERY_FILE})"
 
     cd "${WDIR}/"
 
-    export RECOVERY_FILE="${WDIR}/recovery/recovery.img"
-    export RECOVERY_SIZE=$(stat -c%s "${WDIR}/recovery/recovery.img")
     set +x
 }
 
 # Extract recovery.img
 extract_recovery_image(){
-    cd "${WDIR}/unpacked/"
+    cd "$(dirname $BOOT_EDITOR)"
 
-    echo -e "\n${LIGHT_YELLOW}[INFO] Extracting:${RESET} ${BOLD}${RECOVERY_FILE}${RESET}\n"
+    echo -e "\n${LIGHT_YELLOW}[INFO] Extracting:${RESET} ${BOLD}${RECOVERY_FILE}${RESET}"
 
-	${MAGISKBOOT} unpack ${RECOVERY_FILE}
-	${MAGISKBOOT} cpio ramdisk.cpio extract
+    # Clean the previous work
+    set +e ; r_clean >/dev/null 2>&1 ; set -e
+
+    # Copied the file to the boot editor's path
+    cp -ar $RECOVERY_FILE "$(dirname $BOOT_EDITOR)" 
+
+    # Unpack
+    r_unpack >/dev/null 2>&1
+
+    # Some hack to find the exact file to patch
+    export PATCHING_TARGET=$(find . -wholename "*/system/bin/recovery" -exec realpath {} \; | head -n 1)
+    if [ -n "$PATCHING_TARGET" ]; then
+        echo -e "\n${BOLD}${MINT_GREEN}[INFO] Found target:${RESET} ${BOLD}$(basename ${PATCHING_TARGET})${RESET}"
+    else
+        echo -e "\n${BOLD}${RED}Error: target file not found for patching.${RESET}"
+        exit 1
+    fi
+
     cd "${WDIR}/"
 
     echo ""    
@@ -152,49 +176,29 @@ apply_hex_patches(){
 
 # Hex patch the "recovery" binary to get fastbootd mode back
 hexpatch_recovery_image(){
-    cd "${WDIR}/unpacked/"
-    
-    local recovery_binary="system/bin/recovery"
-    
-    if [ ! -f "${recovery_binary}" ]; then
-        echo -e "${BOLD}${RED}[ERROR] Recovery binary not found: ${recovery_binary}${RESET}\n"
-        exit 1
-    fi
+
+    local recovery_binary="${PATCHING_TARGET}"
     
     # Apply hex patches and check result
     if ! apply_hex_patches "${recovery_binary}"; then
         echo -e "${BOLD}${RED}[FATAL] Hex patching failed, cannot continue${RESET}\n"
         exit 1
     fi
-    
-    cd "${WDIR}/"
+
 }
 
 # Repack the fastbootd patched recovery image
 repack_recovery_image(){
 
-    cd "${WDIR}/unpacked/"
-    
-    ${MAGISKBOOT}  cpio ramdisk.cpio 'add 0755 system/bin/recovery system/bin/recovery'
+    cd "$(dirname $BOOT_EDITOR)"
 
-    echo -e "\n${LIGHT_YELLOW}[INFO] Repacking to:${RESET} ${BOLD}${WDIR}/output/patched-recovery.img${RESET}\n"
+    echo -e "\n${LIGHT_YELLOW}[INFO] Repacking to:${RESET} ${BOLD}${WDIR}/output/${IMAGE_NAME}${RESET}\n"
 
-	${MAGISKBOOT}  repack ${RECOVERY_FILE} "${WDIR}/output/patched-recovery.img"
+    r_repack >/dev/null 2>&1
+
+	mv -f "$(ls *.signed)" "${WDIR}/output/${IMAGE_NAME}"
 
     cd "${WDIR}/"
-}
-
-# Sign the patched-recovery.img with Google's RSA private test key
-sign_recovery_image(){
-    echo -e "\n${LIGHT_YELLOW}[INFO] Signing with Google's RSA private test key:${RESET} ${BOLD}${WDIR}/output/patched-recovery.img${RESET}\n"
-
-    ${AVBTOOL} \
-        add_hash_footer \
-        --partition_name recovery \
-        --partition_size ${RECOVERY_SIZE} \
-        --image "${WDIR}/output/patched-recovery.img" \
-        --key ${AVB_KEY} \
-        --algorithm SHA256_RSA2048
 }
 
 # Create an ODIN-flashable tar
@@ -202,18 +206,17 @@ create_tar(){
 
     cd "${WDIR}/output/"
 
-    mv patched-recovery.img recovery.img && \
-        lz4 -B6 --content-size recovery.img recovery.img.lz4 && \
-        rm recovery.img
+    lz4 -B6 --content-size ${IMAGE_NAME} ${IMAGE_NAME}.lz4 && \
+        rm ${IMAGE_NAME}
 
-    tar -cvf "${MODEL}-Fastbootd-patched-recovery.tar" recovery.img.lz4 && \
-        rm recovery.img.lz4
+    tar -cvf "${MODEL}-Fastbootd-patched-${IMAGE_NAME%.*}.tar" ${IMAGE_NAME}.lz4 && \
+        rm ${IMAGE_NAME}.lz4
 
-    echo -e "\n${LIGHT_YELLOW}[INFO] Created ODIN-flashable tar:${RESET} ${BOLD}${PWD}/${MODEL}-Fastbootd-patched-recovery.tar${RESET}\n"
+    echo -e "\n${LIGHT_YELLOW}[INFO] Created ODIN-flashable tar:${RESET} ${BOLD}${PWD}/${MODEL}-Fastbootd-patched-${IMAGE_NAME%.*}.tar${RESET}\n"
 
     # Optional GoFile upload
     if [[ "$GOFILE" == "1" ]]; then
-        upload_to_gofile "${MODEL}-Fastbootd-patched-recovery.tar"
+        upload_to_gofile "${MODEL}-Fastbootd-patched-${IMAGE_NAME%.*}.tar"
     fi
     
     cd "${WDIR}/"
@@ -221,7 +224,8 @@ create_tar(){
 
 cleanup_source(){
     rm -rf "${WDIR}/recovery/"*
-    rm -rf "${WDIR}/unpacked/"*    
+
+    cd "$(dirname $BOOT_EDITOR)" ; set +e ; r_clean >/dev/null 2>&1 ; set -e ; cd "${WDIR}"
 }
 
 init_patch_recovery
@@ -230,6 +234,5 @@ unarchive_recovery
 extract_recovery_image
 hexpatch_recovery_image
 repack_recovery_image
-sign_recovery_image
 create_tar
 cleanup_source
