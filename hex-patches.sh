@@ -72,6 +72,13 @@ declare -a HEX_PATCHES=(
     "cafdff54f4031f2a:cafdff5434008052"
     "ab4a0394f4031f2a:ab4a039434008052"
 
+    # SM-A015F (32-Bit)
+    "884203d1284609b0:884203d1012009b0"
+    "2548002578442ce0:2548012578442ce0"
+    "28480025784430e0:28480125784430e0"
+    "1a29efda002511e0:1a29efda012511e0"
+    "7844b4f0a0ed0025:7844b4f0a0ed0125"
+
     # Add more patches here as needed
     # Format: "search_pattern:replace_pattern"
 )
