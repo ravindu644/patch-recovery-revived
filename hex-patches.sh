@@ -48,6 +48,13 @@ declare -a HEX_PATCHES=(
     "47a00494e0031f2a:47a0049420008052"
     "e89f0494f3031f2a:e89f049433008052"
 
+    # SM-M145F, UI 6.1
+    "21010054e003142af44f48a9:2101005420008052f44f48a9" # <- direct patch GetFastbootdPermission
+    "0ef70394f4031f2a:0ef7039434008052" # <- or return true to ""/system/bin/fastbootd can't be invoked"
+    "f4031f2a737a2491:34008052737a2491" # <- or patch the /proc/cmdline checking
+    "f4031f2a73e62191:3400805273e62191" # <- or patch "the deivce does not have a fastbootd token, so don't allow fastbootd"
+    "f4031f2a0c000014:340080520c000014"
+
     # Add more patches here as needed
     # Format: "search_pattern:replace_pattern"
 )
