@@ -40,6 +40,10 @@ declare -a HEX_PATCHES=(
     # Galaxy S23fe
     "a81640f9a9835ff81f0109eb21010054e003142a:a81640f9a9835ff81f0109eb2101005420008052"
 
+    # A556E
+    "47a00494e0031f2a:47a0049420008052"
+    "e89f0494f3031f2a:e89f049433008052"
+
     # Add more patches here as needed
     # Format: "search_pattern:replace_pattern"
 )
