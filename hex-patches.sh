@@ -29,6 +29,7 @@ declare -a HEX_PATCHES=(
     
     # One UI 7 - Galaxy A16 5G patches, Issue #4
     "9b880494e0031f2a:9b88049420008052"
+    "38880494f3031f2a:3888049433008052"
 
     # Galaxy S25, Issue #7
     "7abb0594e0031f2a:7abb059420008052"
