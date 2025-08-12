@@ -55,6 +55,13 @@ declare -a HEX_PATCHES=(
     "f4031f2a73e62191:3400805273e62191" # <- or patch "the deivce does not have a fastbootd token, so don't allow fastbootd"
     "f4031f2a0c000014:340080520c000014"
 
+    # SM-M215F
+    "a81640f9a9835ff81f0109eb21010054e003142a:a81640f9a9835ff81f0109eb2101005420008052"
+    "13faffb0f4031f2a:13faffb034008052"
+    "f3f9fff0f4031f2a:f3f9fff034008052"
+    "cafdff54f4031f2a:cafdff5434008052"
+    "ab4a0394f4031f2a:ab4a039434008052"
+
     # Add more patches here as needed
     # Format: "search_pattern:replace_pattern"
 )
