@@ -79,6 +79,10 @@ declare -a HEX_PATCHES=(
     "1a29efda002511e0:1a29efda012511e0"
     "7844b4f0a0ed0025:7844b4f0a0ed0125"
 
+    # SM-A346E
+    "2bc50694e0031f2a:2bc5069420008052"    
+    "e7c50694f4031f2a:e7c5069434008052"
+
     # Add more patches here as needed
     # Format: "search_pattern:replace_pattern"
 )
