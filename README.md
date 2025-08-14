@@ -75,5 +75,3 @@ If the tool does not enable fastboot mode for your device, please start an issue
 Developed by [@ravindu644](https://github.com/ravindu644).
 
 Got the idea from [phhusson](https://github.com/phhusson), [Johx22](https://github.com/Johx22), [ratcoded](https://github.com/ratcoded).
-
-(This entire README and the commit messages were written by GitHub Copilot since I was too lazy. The code, however, is almost 95% written by me 😌)

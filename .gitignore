@@ -2,3 +2,5 @@ output/*
 recovery/*
 unpacked/*
 .requirements
+log/*
+boot_editor_v15_r1
