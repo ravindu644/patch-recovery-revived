@@ -34,10 +34,8 @@ warn() {
 }
 
 fatal() {
-    {
-        warn "[FATAL]" "$1"
-        upload_to_gofile "${WDIR}/log/log.txt"
-        warn "\n[NOTICE]" "Uploaded the logs to GoFile. Please create an issue on GitHub with it. Aborting..."
-    } >> "${WDIR}/log/log.txt" 2>&1
+    warn "[FATAL]" "$1"
+    upload_to_gofile "${WDIR}/log/log.txt"
+    warn "\n[NOTICE]" "Uploaded the logs to GoFile. Please create an issue on GitHub with it. Aborting..."
     exit 1
 }

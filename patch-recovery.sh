@@ -111,7 +111,7 @@ extract_recovery_image(){
     cp -ar $RECOVERY_FILE "$(dirname $BOOT_EDITOR)" 
 
     # Unpack
-    r_unpack >>"${WDIR}/log/log.txt" 2>&1
+    r_unpack >>"${WDIR}/log/log.txt" 2>&1 || fatal "Unpacking failed\n"
 
     # Some hack to find the exact file to patch
     export PATCHING_TARGET=$(find . -wholename "*/system/bin/recovery" -exec realpath {} \; | head -n 1)
@@ -192,7 +192,7 @@ repack_recovery_image(){
 
     log "\n[INFO] Repacking to" "${WDIR}/output/${IMAGE_NAME}\n"
 
-    r_repack >>"${WDIR}/log/log.txt" 2>&1
+    r_repack >>"${WDIR}/log/log.txt" 2>&1 || fatal "Repacking failed\n"
 
 	mv -f "$(ls *.signed)" "${WDIR}/output/${IMAGE_NAME}"
 
