@@ -113,6 +113,10 @@ extract_recovery_image(){
     # Unpack
     r_unpack >>"${WDIR}/log/log.txt" 2>&1 || fatal "Unpacking failed\n"
 
+    # check if the binary exists
+    FASTBOOTD=$(find . -type f -path "*/system/bin/fastbootd" -exec realpath {} \; 2>/dev/null | head -n 1)
+    [ -n "$FASTBOOTD" ] || fatal "Your recovery does not have a fastbootd binary. Patching would be useless. Aborting.."
+
     # Some hack to find the exact file to patch
     export PATCHING_TARGET=$(find . -wholename "*/system/bin/recovery" -exec realpath {} \; | head -n 1)
     if [ -n "$PATCHING_TARGET" ]; then
