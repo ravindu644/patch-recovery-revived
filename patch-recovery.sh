@@ -73,12 +73,10 @@ download_recovery(){
 
 # Check if the downloaded/copied file an archive
 unarchive_recovery(){
-
-    set -x 
     cd "${WDIR}/recovery/"
     local FILE=$(ls)
     [[ "$FILE" == *.zip ]] && unzip "$FILE" && rm "$FILE"
-    [[ "$FILE" == *.lz4 ]] && lz4 -d "$FILE" "${FILE%.lz4}" && rm "$FILE"
+    [[ "$FILE" == *.lz4 ]] && lz4 -d "$FILE" "${FILE%.lz4}" > /dev/null 2>&1 && rm "$FILE"
 
     # Check for recovery or vendor boot image
     if [ -f "recovery.img" ]; then
@@ -94,8 +92,6 @@ unarchive_recovery(){
     export IMAGE_NAME="$(basename ${RECOVERY_FILE})"
 
     cd "${WDIR}/"
-
-    set +x
 }
 
 # Extract recovery.img
@@ -115,7 +111,7 @@ extract_recovery_image(){
 
     # check if the binary exists
     FASTBOOTD=$(find . -type f -path "*/system/bin/fastbootd" -exec realpath {} \; 2>/dev/null | head -n 1)
-    [ -n "$FASTBOOTD" ] || fatal "Your recovery does not have a fastbootd binary. Patching would be useless. Aborting.."
+    [ -n "$FASTBOOTD" ] || fatal "Your recovery does not have a fastbootd binary. Patching would be useless. Aborting..\n"
 
     # Some hack to find the exact file to patch
     export PATCHING_TARGET=$(find . -wholename "*/system/bin/recovery" -exec realpath {} \; | head -n 1)
