@@ -8,7 +8,7 @@ on:
         required: true
 
       recovery_link:
-        description: 'Enter the Direct Download Link (.img / .lz4 / .zip):'
+        description: 'Enter the Direct Download Link (.img / .lz4 / .zip / .tar):'
         required: true   
               
 jobs:
