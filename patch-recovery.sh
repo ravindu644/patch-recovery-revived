@@ -77,6 +77,7 @@ unarchive_recovery(){
     local FILE=$(ls)
     [[ "$FILE" == *.zip ]] && unzip "$FILE" && rm "$FILE"
     [[ "$FILE" == *.lz4 ]] && lz4 -d "$FILE" "${FILE%.lz4}" > /dev/null 2>&1 && rm "$FILE"
+    [[ "$FILE" == *.tar ]] && tar -xf "$FILE" && rm "$FILE"
 
     # Check for recovery or vendor boot image
     if [ -f "recovery.img" ]; then
