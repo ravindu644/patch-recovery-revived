@@ -79,6 +79,14 @@ unarchive_recovery(){
     [[ "$FILE" == *.lz4 ]] && lz4 -d "$FILE" "${FILE%.lz4}" > /dev/null 2>&1 && rm "$FILE"
     [[ "$FILE" == *.tar ]] && tar -xf "$FILE" && rm "$FILE"
 
+    # Decompress any lz4 files that were extracted from zip/tar archives
+    for lz4_file in *.lz4; do
+        if [ -f "$lz4_file" ]; then
+            log "[INFO]" "Decompressing ${lz4_file}"
+            lz4 -d "$lz4_file" "${lz4_file%.lz4}" >>"${WDIR}/log/log.txt" 2>&1 && rm "$lz4_file"
+        fi
+    done
+
     # Check for recovery or vendor boot image
     if [ -f "recovery.img" ]; then
         export RECOVERY_FILE="$(pwd)/recovery.img"
@@ -87,6 +95,10 @@ unarchive_recovery(){
     else
         warn "[ERROR]" "give a proper recovery.img or vendor_boot.img"
         exit 1
+    fi
+
+    if [ -f "boot.img" ]; then
+        export BOOT_FILE="$(pwd)/boot.img"
     fi
 
     export RECOVERY_SIZE=$(stat -c%s "${RECOVERY_FILE}")
@@ -191,13 +203,51 @@ repack_recovery_image(){
 
     cd "$(dirname $BOOT_EDITOR)"
 
-    log "\n[INFO] Repacking to" "${WDIR}/output/${IMAGE_NAME}\n"
+    log "[INFO] Repacking to" "${WDIR}/output/${IMAGE_NAME}\n"
 
     r_repack >>"${WDIR}/log/log.txt" 2>&1 || fatal "Repacking failed\n"
 
 	mv -f "$(ls *.signed)" "${WDIR}/output/${IMAGE_NAME}"
 
     cd "${WDIR}/"
+}
+
+break_boot_image(){
+    # Break the SHA1 hash of the boot image by unpacking and repacking it
+    if [ -n "$BOOT_FILE" ] && [ -f "$BOOT_FILE" ]; then
+        log "\n[INFO] Breaking boot image signature" "${BOOT_FILE}"
+        
+        # Create a temporary directory for boot image processing
+        local TEMP_DIR=$(mktemp -d -t boot_break.XXXXXX)
+        trap "rm -rf '${TEMP_DIR}'" EXIT
+        
+        # Copy boot.img to temp directory
+        cp "${BOOT_FILE}" "${TEMP_DIR}/boot.img"
+        cd "${TEMP_DIR}"
+        
+        # Unpack the boot image
+        log "[INFO] Unpacking" "boot.img"
+        ${MAGISKBOOT} unpack boot.img >>"${WDIR}/log/log.txt" 2>&1 || fatal "Failed to unpack boot.img\n"
+        
+        # Repack the boot image (this breaks the signature)
+        log "[INFO] Repacking" "boot.img (signature will be broken)"
+        ${MAGISKBOOT} repack boot.img >>"${WDIR}/log/log.txt" 2>&1 || fatal "Failed to repack boot.img\n"
+        
+        # Move new-boot.img to output directory as boot.img
+        if [ -f "new-boot.img" ]; then
+            mv -f "new-boot.img" "${WDIR}/output/boot.img"
+            info "\n[SUCCESS]" "Boot image signature broken, saved to output/boot.img\n"
+        else
+            fatal "new-boot.img was not created after repacking\n"
+        fi
+        
+        # Return to working directory and remove temp directory
+        cd "${WDIR}/"
+        rm -rf "${TEMP_DIR}"
+        trap - EXIT
+    else
+        log "[INFO]" "No boot.img found, skipping boot image signature breaking\n"
+    fi
 }
 
 # Create an ODIN-flashable tar
@@ -208,8 +258,20 @@ create_tar(){
     lz4 -B6 --content-size ${IMAGE_NAME} ${IMAGE_NAME}.lz4 && \
         rm ${IMAGE_NAME}
 
-    tar -cvf "${MODEL}-Fastbootd-patched-${IMAGE_NAME%.*}.tar" ${IMAGE_NAME}.lz4 && \
-        rm ${IMAGE_NAME}.lz4
+    # Build tar command with recovery image
+    local TAR_FILES="${IMAGE_NAME}.lz4"
+    
+    # Add boot.img to tar if it exists (compress it first)
+    if [ -f "boot.img" ]; then
+        log "[INFO]" "Compressing boot.img with lz4\n"
+        lz4 -B6 --content-size boot.img boot.img.lz4 && \
+            rm boot.img
+        TAR_FILES="${TAR_FILES} boot.img.lz4"
+        log "[INFO]" "Including boot.img.lz4 in tar archive\n"
+    fi
+
+    tar -cvf "${MODEL}-Fastbootd-patched-${IMAGE_NAME%.*}.tar" ${TAR_FILES} && \
+        rm -f *.lz4
 
     info "\n[INFO] Created ODIN-flashable tar" "${PWD}/${MODEL}-Fastbootd-patched-${IMAGE_NAME%.*}.tar\n"
 
@@ -233,5 +295,6 @@ unarchive_recovery
 extract_recovery_image
 hexpatch_recovery_image
 repack_recovery_image
+break_boot_image
 create_tar
 cleanup_source

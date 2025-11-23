@@ -15,12 +15,14 @@ The only working `patch-recovery` tool that ever lived to patch Samsung's recove
 - Supports both `recovery` and `vendor_boot` images.
 - Automatically downloads and processes recovery images from a provided URL or local path.
 - Hex-patches the recovery binary to enable **fastbootd** mode.
+- **Boot image patching**: You can also upload your `boot.img` along with `recovery.img`/`vendor_boot.img` to patch the boot image, which removes stock recovery auto-restoration issues on some devices.
 - Creates an ODIN-flashable `.tar` file for easy flashing.
 
 Notes:
 
 - All the hex patches are located in [this database file](./hex-patches.sh).  
-- On Samsung devices, `vendor_boot` contains the recovery ramdisk, only if the device uses the A/B partition scheme.  
+- On Samsung devices, `vendor_boot` contains the recovery ramdisk, only if the device uses the A/B partition scheme.
+- If you include `boot.img` in your archive (`.zip`, `.tar`, etc.), the script will automatically unpack and repack it to break its signature, preventing stock recovery auto-restoration issues.  
 
 
 
@@ -40,10 +42,11 @@ Use the GitHub Actions workflow to automate the process:
 2. Trigger the workflow manually via the **Actions** tab.
 3. Provide the required inputs:
    - **Model**: Your device's model number.
-   - **Recovery Link**: Direct download link to the recovery image.
+   - **Recovery Link**: Direct download link to the recovery image. For a single image, provide a link to an `.img` file. If you want to patch multiple images (e.g., `vendor_boot.img` + `boot.img` or `recovery.img` + `boot.img`) to prevent stock recovery auto-restoration, zip the relevant images together and upload the zip's link.
    - You can upload the recovery and get a direct link from https://filebin.net/
 
 - The workflow will generate a patched recovery image and upload it as an artifact.
+- If your archive contains `boot.img`, it will be automatically patched to remove stock recovery auto-restoration issues.
 - Optionally uploaded to [GoFile](https://gofile.io/) for easy sharing.
 
 ### Output
