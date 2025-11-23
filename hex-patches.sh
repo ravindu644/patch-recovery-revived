@@ -86,6 +86,13 @@ declare -a HEX_PATCHES=(
     # Galaxy S23 Series, Z Flip5, Z Fold5, Issue #11 (One UI 7, 8)
     "9b110494e0031f2a:9b11049420008052"
 
+    # Galaxy A06 5G - One UI 7
+    "e003142af44f48a9:20008052f44f48a9"
+    "f4031f2a735e1c91:34008052735e1c91"
+    "f4031f2a73aa1991:3400805273aa1991"
+    "f4031f2a0c000014:340080520c000014"
+    "43880494f4031f2a:4388049434008052"
+
     # Add more patches here as needed
     # Format: "search_pattern:replace_pattern"
 )
